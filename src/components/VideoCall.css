@@ -48,57 +48,124 @@
 }
 
 .video-room {
-  width: 100%;
-  height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.controls {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #eee;
-}
-
-.controls button {
-  padding: 8px 16px;
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.controls button:hover {
-  background-color: #c82333;
-}
-
-.video-container {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 16px;
-  padding: 16px;
-  background-color: #eee;
-}
-
-.local-video, .remote-video {
+  justify-content: space-between;
+  min-height: 100vh;
   width: 100%;
-  height: 300px;
-  background-color: black;
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
+  background-color: #191c25;
+  color: white;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-@media (max-width: 768px) {
-  .video-container {
-    grid-template-columns: 1fr;
-  }
+.video-grid {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 100%;
+  flex: 1;
+  align-items: center;
+}
+
+.participant-container,
+.empty-participant {
+  position: relative;
+  width: clamp(300px, 40vw, 480px);
+  height: clamp(225px, 30vw, 360px);
+  border-radius: 15px;
+  overflow: hidden;
+  background-color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.university-name {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 8px 10px;
+  font-size: clamp(14px, 1.5vw, 18px);
+  font-weight: bold;
+  text-align: center;
+  z-index: 10;
+  color: white;
+}
+
+.participant-name {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: clamp(12px, 1.2vw, 14px);
+  z-index: 10;
+  color: white;
+}
+
+.video-frame {
+  width: 100%;
+  height: 100%;
+  background-color: #333;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.empty-participant .university-name {
+  /* Keep university name visible */
+}
+
+.waiting-message {
+  color: #ccc;
+  font-size: clamp(14px, 1.5vw, 16px);
+}
+
+.channel-display {
+  padding: 15px 0;
+  text-align: center;
+  font-size: clamp(14px, 1.5vw, 16px);
+  color: #eee;
+}
+
+.channel-code {
+  font-weight: bold;
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.control-panel {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  padding-bottom: 20px;
+  width: 100%;
+}
+
+.control-button {
+  width: clamp(50px, 6vw, 60px);
+  height: clamp(50px, 6vw, 60px);
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.control-button:hover {
+  opacity: 0.85;
+}
+
+.control-button:active {
+  transform: scale(0.95);
 }
 
 .error-message {
@@ -108,12 +175,13 @@
   justify-content: center;
   width: 100%;
   max-width: 500px;
-  margin: 0 auto;
+  margin: auto;
   padding: 24px;
   border-radius: 8px;
   background-color: #fff0f0;
   border: 1px solid #ffcaca;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  color: #333;
 }
 
 .error-message h2 {
@@ -123,7 +191,69 @@
 }
 
 .error-message p {
-  color: #333;
   margin: 0;
   text-align: center;
+}
+
+@media (max-width: 992px) {
+  .video-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .participant-container, .empty-participant {
+    height: 280px;
+  }
+}
+
+/* Join Room Form Styles */
+.join-room-container {
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 30px;
+  background-color: #1a1b26;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.join-room-container h2 {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+.join-room-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.join-room-container input {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #3a3d4a;
+  background-color: #2c2e3a;
+  color: white;
+  font-size: 16px;
+}
+
+.join-room-container input::placeholder {
+  color: #8a8d9a;
+}
+
+.join-room-container button {
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background-color: #70B98B; /* Green color from control panel */
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.join-room-container button:hover {
+  background-color: #5da979;
 } 

@@ -37,20 +37,197 @@ const turnServerConfig = {
   forceturn: true,
 };
 
-const VideoCall = () => {
+// Participant component with university name
+const ParticipantVideo = ({
+  videoRef,
+  name,
+  userName,
+}: {
+  videoRef: React.RefObject<HTMLDivElement | null>;
+  name: string;
+  userName?: string;
+}) => {
+  return (
+    <div className="participant-container">
+      <div className="university-name">{name}</div>
+      <div className="video-frame" ref={videoRef}></div>
+      {userName && <div className="participant-name">{userName}</div>}
+    </div>
+  );
+};
+
+// Control button component
+const ControlButton = ({
+  color,
+  onClick,
+  children,
+}: {
+  color: string;
+  onClick?: () => void;
+  children?: React.ReactNode;
+}) => {
+  return (
+    <button
+      className="control-button"
+      style={{ backgroundColor: color }}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+};
+
+// Join Room component
+const JoinRoomForm = ({ onJoin }: { onJoin: (channel: string) => void }) => {
+  const [channelName, setChannelName] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (channelName.trim()) {
+      onJoin(channelName);
+    }
+  };
+
+  return (
+    <div className="join-room-container">
+      <h2>Join a Video Room</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={channelName}
+          onChange={(e) => setChannelName(e.target.value)}
+          placeholder="Enter room code"
+          required
+        />
+        <button type="submit">Join Room</button>
+      </form>
+    </div>
+  );
+};
+
+// The main video room component
+const VideoRoom = () => {
   const [inCall, setInCall] = useState(false);
   const [channelName, setChannelName] = useState("");
+  const [users, setUsers] = useState<IAgoraRTCRemoteUser[]>([]);
+  const [localVideoTrack, setLocalVideoTrack] =
+    useState<ICameraVideoTrack | null>(null);
+  const [localAudioTrack, setLocalAudioTrack] =
+    useState<IMicrophoneAudioTrack | null>(null);
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
+  const localVideoRef = useRef<HTMLDivElement>(null);
   const [configError, setConfigError] = useState<string | null>(null);
 
+  const joinRoom = (channel: string) => {
+    setChannelName(channel);
+    setInCall(true);
+  };
+
+  // Effect for checking config and initializing Agora
   useEffect(() => {
-    // Check if appId is configured
+    if (!inCall) return; // Don't initialize if not in a call
+
     if (!appId) {
       setConfigError(
-        "Agora App ID is not configured. Please set it in the VideoCall.tsx file."
+        "Agora App ID is not configured. Please check your .env file."
       );
+      return;
     }
-  }, []);
 
+    const client = AgoraRTC.createClient(config);
+    clientRef.current = client;
+
+    const init = async () => {
+      try {
+        if (import.meta.env.VITE_TURN_SERVER_URL) {
+          await client.setTurnServer(turnServerConfig);
+          console.log("TURN server configured.");
+        } else {
+          console.log(
+            "TURN server URL not found, skipping TURN configuration."
+          );
+        }
+
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        const videoTrack = await AgoraRTC.createCameraVideoTrack();
+
+        setLocalAudioTrack(audioTrack);
+        setLocalVideoTrack(videoTrack);
+
+        if (localVideoRef.current) {
+          videoTrack.play(localVideoRef.current);
+        }
+
+        client.on("user-published", handleUserPublished);
+        client.on("user-unpublished", handleUserUnpublished);
+        client.on("user-left", handleUserLeft);
+
+        await client.join(appId, channelName, token, null);
+        await client.publish([audioTrack, videoTrack]);
+
+        console.log("Successfully joined channel and published tracks");
+      } catch (error) {
+        console.error("Error initializing Agora:", error);
+        setConfigError(`Failed to initialize Agora: ${error}`);
+      }
+    };
+
+    init();
+
+    return () => {
+      localAudioTrack?.close();
+      localVideoTrack?.close();
+      clientRef.current?.leave();
+      clientRef.current?.removeAllListeners();
+    };
+  }, [channelName, inCall]); // Rerun if channelName or inCall changes
+
+  // --- Agora Event Handlers ---
+  const handleUserPublished = async (
+    user: IAgoraRTCRemoteUser,
+    mediaType: "audio" | "video"
+  ) => {
+    if (!clientRef.current) return;
+    await clientRef.current.subscribe(user, mediaType);
+
+    if (mediaType === "video") {
+      setUsers((prevUsers) => {
+        if (prevUsers.find((u) => u.uid === user.uid)) return prevUsers;
+        return [...prevUsers, user];
+      });
+    }
+
+    if (mediaType === "audio") {
+      user.audioTrack?.play();
+    }
+  };
+
+  const handleUserUnpublished = (
+    user: IAgoraRTCRemoteUser,
+    mediaType: "audio" | "video"
+  ) => {
+    if (mediaType === "video") {
+      setUsers((prevUsers) => prevUsers.filter((u) => u.uid !== user.uid));
+    }
+  };
+
+  const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
+    setUsers((prevUsers) => prevUsers.filter((u) => u.uid !== user.uid));
+  };
+  // --- End Agora Event Handlers ---
+
+  // --- Leave Call Functionality ---
+  const leaveCall = async () => {
+    localAudioTrack?.close();
+    localVideoTrack?.close();
+    await clientRef.current?.leave();
+    setUsers([]);
+    setInCall(false);
+    console.log("Left the call");
+  };
+  // --- End Leave Call ---
+
+  // --- Render Logic ---
   if (configError) {
     return (
       <div className="error-message">
@@ -60,227 +237,82 @@ const VideoCall = () => {
     );
   }
 
-  return (
-    <div className="video-call-container">
-      {inCall ? (
-        <VideoRoom setInCall={setInCall} channelName={channelName} />
-      ) : (
-        <ChannelForm setInCall={setInCall} setChannelName={setChannelName} />
-      )}
-    </div>
-  );
-};
-
-// Form for entering channel name and joining
-const ChannelForm = ({
-  setInCall,
-  setChannelName,
-}: {
-  setInCall: React.Dispatch<React.SetStateAction<boolean>>;
-  setChannelName: React.Dispatch<React.SetStateAction<string>>;
-}) => {
-  const [input, setInput] = useState("");
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (input !== "") {
-      setChannelName(input);
-      setInCall(true);
-    }
-  };
-
-  return (
-    <form className="join-form" onSubmit={handleSubmit}>
-      <h2>Join a Video Call</h2>
-      <input
-        type="text"
-        placeholder="Enter Channel Name"
-        onChange={(e) => setInput(e.target.value)}
-        value={input}
-      />
-      <button type="submit">Join</button>
-    </form>
-  );
-};
-
-// The main video room component
-const VideoRoom = ({
-  setInCall,
-  channelName,
-}: {
-  setInCall: React.Dispatch<React.SetStateAction<boolean>>;
-  channelName: string;
-}) => {
-  const [users, setUsers] = useState<IAgoraRTCRemoteUser[]>([]);
-  const [localVideoTrack, setLocalVideoTrack] =
-    useState<ICameraVideoTrack | null>(null);
-  const [localAudioTrack, setLocalAudioTrack] =
-    useState<IMicrophoneAudioTrack | null>(null);
-
-  const clientRef = useRef<IAgoraRTCClient | null>(null);
-  const localVideoRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Create and initialize the Agora client
-    const client = AgoraRTC.createClient(config);
-    clientRef.current = client;
-
-    // Function to initialize local tracks and join channel
-    const init = async () => {
-      try {
-        // Set ICE servers for NAT traversal (TURN support)
-        // Only set TURN server if the URL is provided
-        if (import.meta.env.VITE_TURN_SERVER_URL) {
-          await client.setTurnServer(turnServerConfig);
-          console.log("TURN server configured.");
-        } else {
-          console.log(
-            "TURN server URL not found in environment variables, skipping TURN configuration."
-          );
-        }
-
-        // Create local audio and video tracks
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-        const videoTrack = await AgoraRTC.createCameraVideoTrack();
-
-        setLocalAudioTrack(audioTrack);
-        setLocalVideoTrack(videoTrack);
-
-        // Play local video track
-        if (localVideoRef.current) {
-          videoTrack.play(localVideoRef.current);
-        }
-
-        // Setup event handlers
-        client.on("user-published", handleUserPublished);
-        client.on("user-unpublished", handleUserUnpublished);
-        client.on("user-left", handleUserLeft);
-
-        // Join the channel
-        await client.join(appId, channelName, token, null);
-
-        // Publish local tracks
-        await client.publish([audioTrack, videoTrack]);
-
-        console.log("Successfully joined channel and published local tracks");
-      } catch (error) {
-        console.error("Error initializing tracks or joining channel:", error);
-      }
-    };
-
-    init();
-
-    // Cleanup function
-    return () => {
-      if (localAudioTrack) {
-        localAudioTrack.close();
-      }
-      if (localVideoTrack) {
-        localVideoTrack.close();
-      }
-      if (clientRef.current) {
-        clientRef.current.leave();
-        clientRef.current.removeAllListeners();
-      }
-    };
-  }, [channelName]);
-
-  // Handler for when a remote user publishes a track
-  const handleUserPublished = async (
-    user: IAgoraRTCRemoteUser,
-    mediaType: "audio" | "video"
-  ) => {
-    if (!clientRef.current) return;
-
-    // Subscribe to the remote user
-    await clientRef.current.subscribe(user, mediaType);
-
-    // If it's video, update the users list
-    if (mediaType === "video") {
-      setUsers((prevUsers) => {
-        // Check if user already exists
-        if (prevUsers.find((u) => u.uid === user.uid)) {
-          return prevUsers;
-        }
-        return [...prevUsers, user];
-      });
-    }
-
-    // Play the audio if it's audio track
-    if (mediaType === "audio" && user.audioTrack) {
-      user.audioTrack.play();
-    }
-  };
-
-  // Handler for when a remote user unpublishes a track
-  const handleUserUnpublished = (
-    user: IAgoraRTCRemoteUser,
-    mediaType: "audio" | "video"
-  ) => {
-    if (mediaType === "video") {
-      setUsers((prevUsers) => {
-        return prevUsers.filter((User) => User.uid !== user.uid);
-      });
-    }
-  };
-
-  // Handler for when a remote user leaves
-  const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
-    setUsers((prevUsers) => {
-      return prevUsers.filter((User) => User.uid !== user.uid);
-    });
-  };
-
-  // Handle leave call
-  const leaveCall = async () => {
-    if (localAudioTrack) {
-      localAudioTrack.close();
-    }
-    if (localVideoTrack) {
-      localVideoTrack.close();
-    }
-    if (clientRef.current) {
-      await clientRef.current.leave();
-    }
-    setInCall(false);
-  };
+  if (!inCall) {
+    return <JoinRoomForm onJoin={joinRoom} />;
+  }
 
   return (
     <div className="video-room">
-      <div className="controls">
-        <h3>Channel: {channelName}</h3>
-        <p>Participants: {users.length + 1}</p>
-        <button onClick={leaveCall}>Leave Call</button>
+      <div className="video-grid">
+        {/* Local video - always University of Oregon */}
+        <ParticipantVideo
+          videoRef={localVideoRef}
+          name="University of Oregon"
+          userName="Freddie F."
+        />
+
+        {/* Remote videos - map users, assign Texas Christian University to the first */}
+        {users.length > 0 ? (
+          users.map((user, index) => (
+            <RemoteVideo
+              key={user.uid}
+              user={user}
+              name={
+                index === 0
+                  ? "Texas Christian University"
+                  : `Participant ${index + 1}` // Fallback name
+              }
+              userName={index === 0 ? "Basim I." : undefined} // Assign Basim to the first remote user
+            />
+          ))
+        ) : (
+          // Placeholder for the second participant if no remote users
+          <div className="empty-participant">
+            <div className="university-name">Texas Christian University</div>
+            <div className="waiting-message">Waiting for participant...</div>
+          </div>
+        )}
       </div>
 
-      <div className="video-container">
-        {/* Local video */}
-        <div className="local-video" ref={localVideoRef}></div>
+      <div className="channel-display">
+        <p>
+          Channel Code: <span className="channel-code">{channelName}</span>
+        </p>
+      </div>
 
-        {/* Remote videos */}
-        {users.map((user) => (
-          <RemoteVideo key={user.uid} user={user} />
-        ))}
+      <div className="control-panel">
+        <ControlButton color="#D4B851" />
+        <ControlButton color="#E3584D" onClick={leaveCall} />
+        <ControlButton color="#70B98B" />
       </div>
     </div>
   );
 };
 
 // Component to render a remote user's video
-const RemoteVideo = ({ user }: { user: IAgoraRTCRemoteUser }) => {
+const RemoteVideo = ({
+  user,
+  name,
+  userName,
+}: {
+  user: IAgoraRTCRemoteUser;
+  name: string;
+  userName?: string;
+}) => {
   const videoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (videoRef.current && user.videoTrack) {
       user.videoTrack.play(videoRef.current);
-
       return () => {
         user.videoTrack?.stop();
       };
     }
-  }, [user]);
+  }, [user.videoTrack]); // Depend on videoTrack specifically
 
-  return <div className="remote-video" ref={videoRef}></div>;
+  return (
+    <ParticipantVideo videoRef={videoRef} name={name} userName={userName} />
+  );
 };
 
-export default VideoCall;
+export default VideoRoom; // Export VideoRoom as the default
