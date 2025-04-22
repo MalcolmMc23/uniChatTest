@@ -15,3 +15,5 @@ Basic moderation – optional: report or disconnect.
 
 MVP Goal:
 Get two strangers connected and chatting in real time with minimal friction.
+
+I am using RailWay for hosting and agora for video chat.
