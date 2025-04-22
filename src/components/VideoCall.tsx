@@ -17,6 +17,9 @@ const token =
 // ---- Debugging Line ----
 console.log("Attempting to use Agora App ID:", appId);
 // ----------------------
+// ---- Debugging Line ----
+console.log("Attempting to use Token:", token);
+// ----------------------
 
 // Client config
 const config: ClientConfig = {
