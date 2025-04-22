@@ -83,7 +83,26 @@ A simple React application that enables two people to have a video chat using th
    - Open `src/components/VideoCall.tsx`
    - Replace the empty string in `const appId = "";` with your Agora App ID
 
-5. Start the development server:
+5. Configure TURN servers (for reliable connectivity):
+
+   - Open `src/components/VideoCall.tsx`
+   - Locate the `turnServerConfig` object
+   - Replace the placeholder values with your actual TURN server settings:
+
+   ```js
+   const turnServerConfig = {
+     turnServerURL: "YOUR_TURN_SERVER_URL:3478", // URL of your TURN server
+     username: "YOUR_TURN_USERNAME", // TURN server username
+     password: "YOUR_TURN_PASSWORD", // TURN server password
+     udpport: 3478, // UDP port
+     tcpport: 3478, // TCP port
+     forceturn: true, // Force TURN usage
+   };
+   ```
+
+   - You can use a free TURN service like [Coturn](https://github.com/coturn/coturn) or a commercial service
+
+6. Start the development server:
    ```bash
    pnpm dev
    ```
@@ -94,6 +113,15 @@ A simple React application that enables two people to have a video chat using th
 2. Enter a channel name (both users must enter the same channel name)
 3. Click "Join" to enter the video call
 4. Click "Leave Call" to exit the channel
+
+## Network Connectivity
+
+This application is configured to use TURN servers for reliable connectivity even when users are behind restrictive firewalls or NATs. Using TURN ensures that:
+
+- Users can connect from most network environments
+- Peer-to-peer connections are established whenever possible
+- When direct connections aren't possible, media is relayed through the TURN server
+- Approximately 20% of WebRTC calls require TURN servers to function properly
 
 ## Security Note
 

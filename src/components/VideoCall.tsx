@@ -9,8 +9,10 @@ import AgoraRTC, {
 import "./VideoCall.css";
 
 // Agora app configuration
-const appId = ""; // Your Agora App ID
-const token = null; // Your token or set to null if not using token authentication
+// Load env variables from Vite's environment
+const appId = import.meta.env.VITE_APP_ID as string; // Your Agora App ID from .env
+const token =
+  import.meta.env.VITE_TOKEN === "null" ? null : import.meta.env.VITE_TOKEN; // Token or null
 
 // Client config
 const config: ClientConfig = {
@@ -18,9 +20,38 @@ const config: ClientConfig = {
   codec: "vp8",
 };
 
+// TURN server configuration for Agora from env
+const turnServerConfig = {
+  turnServerURL: import.meta.env.VITE_TURN_SERVER_URL,
+  username: import.meta.env.VITE_TURN_USERNAME,
+  password: import.meta.env.VITE_TURN_PASSWORD,
+  udpport: Number(import.meta.env.VITE_TURN_UDP_PORT),
+  tcpport: Number(import.meta.env.VITE_TURN_TCP_PORT),
+  forceturn: true,
+};
+
 const VideoCall = () => {
   const [inCall, setInCall] = useState(false);
   const [channelName, setChannelName] = useState("");
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if appId is configured
+    if (!appId) {
+      setConfigError(
+        "Agora App ID is not configured. Please set it in the VideoCall.tsx file."
+      );
+    }
+  }, []);
+
+  if (configError) {
+    return (
+      <div className="error-message">
+        <h2>Configuration Error</h2>
+        <p>{configError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="video-call-container">
@@ -90,6 +121,17 @@ const VideoRoom = ({
     // Function to initialize local tracks and join channel
     const init = async () => {
       try {
+        // Set ICE servers for NAT traversal (TURN support)
+        // Only set TURN server if the URL is provided
+        if (import.meta.env.VITE_TURN_SERVER_URL) {
+          await client.setTurnServer(turnServerConfig);
+          console.log("TURN server configured.");
+        } else {
+          console.log(
+            "TURN server URL not found in environment variables, skipping TURN configuration."
+          );
+        }
+
         // Create local audio and video tracks
         const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
         const videoTrack = await AgoraRTC.createCameraVideoTrack();
@@ -200,6 +242,7 @@ const VideoRoom = ({
     <div className="video-room">
       <div className="controls">
         <h3>Channel: {channelName}</h3>
+        <p>Participants: {users.length + 1}</p>
         <button onClick={leaveCall}>Leave Call</button>
       </div>
 
