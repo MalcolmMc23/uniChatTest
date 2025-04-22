@@ -14,6 +14,10 @@ const appId = import.meta.env.VITE_APP_ID as string; // Your Agora App ID from .
 const token =
   import.meta.env.VITE_TOKEN === "null" ? null : import.meta.env.VITE_TOKEN; // Token or null
 
+// ---- Debugging Line ----
+console.log("Attempting to use Agora App ID:", appId);
+// ----------------------
+
 // Client config
 const config: ClientConfig = {
   mode: "rtc",
